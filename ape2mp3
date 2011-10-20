@@ -1,0 +1,90 @@
+#!/bin/bash
+
+#
+# ChangeLog:
+#   1. use "mid3v2" to add idv3 tags(UTF-8).
+#
+
+#
+# Usage :
+#      $ ape2mp3 album.cue album.ape
+#
+# Pre-install:
+# 1. mac – Monkey’s Audio Codec (MAC) utility and library
+#     $ yum install mac
+# 2. lame – LAME Ain’t an MP3 Encoder… but it’s the best of all
+#     $ yum install lame
+# 3. shorten – Low complexity and fast waveform coder
+#     $ rpm -ivh shorten-3.6.0-1.2.i386.rpm
+# 4. shntool – Multi-purpose WAVE data processing and reporting utility
+#     $ rpm -ivh shntool-3.0.6-1.i386.rpm
+# 5. cuetools – Utilities to works with cue and TOC files
+#     $ rpm -ivh cuetools-1.3.1-2.i386.rpm
+#
+
+echo "Brian's Archive CUE/FLAC Splitter v0.1"
+echo "No sanity checking in place. Be careful."
+
+if [ $# != 2 ]
+then
+        echo ""
+        echo "Usage:"
+        echo "    $0 cue_file ape_flac_file"
+        echo ""
+        exit 1
+fi
+
+#Get the filenames
+cuefile=$1
+flacfile=$2
+
+#Other variables
+tracks=$(cueprint -d '%N' "$cuefile")
+
+#Get the filenames into an array
+count=1
+while [ $count -le $tracks ]
+do
+        tracknames[$count]=$(cueprint -n$count -t '%p-%T-%02n-%t' "$cuefile"|sed -e s@/@,@g)
+        count=`expr $count + 1`
+done
+
+#Load up the ID3 tag info into variables for later use
+id3count=1
+while [ $id3count -le $tracks ]
+do
+        artist[$id3count]=$(cueprint -n$id3count -t '%p' "$cuefile")
+        album[$id3count]=$(cueprint -n$id3count -t '%T' "$cuefile")
+        tracknum[$id3count]=$(cueprint -n$id3count -t '%02n' "$cuefile")
+        title[$id3count]=$(cueprint -n$id3count -t '%t' "$cuefile")
+        echo "Artist: ${artist[$id3count]}"
+        echo "Album: ${album[$id3count]}"
+        echo "Track No: ${tracknum[$id3count]}"
+        echo "Song Title: ${title[$id3count]}"
+        id3count=$[$id3count + 1]
+done
+
+#Output general file information
+cueprint -d '%P - %T\n' "$cuefile"
+echo "Total number of tracks: " $tracks
+
+#Split this bitch
+cuebreakpoints "$cuefile" | shntool split -a '' -n '%02d' -o wav "$flacfile"
+
+#Convert those waves into mp3s
+convertcount=1
+while [ $convertcount -le $tracks ]
+do
+        wavenum=`printf "%02d" $convertcount`
+
+        lamecmd="lame --add-id3v2 --noreplaygain -b 320 $wavenum.wav ${tracknames[$convertcount]}.mp3"
+        echo $lamecmd
+        set -x
+        #lame --add-id3v2 --noreplaygain -b 320 --ta "${artist[$convertcount]}" --tl "${album[$convertcount]}" --tn "${tracknum[$convertcount]}" --tt "${title[$convertcount]}" "$wavenum.wav" "${tracknames[$convertcount]}.mp3"
+        $lamecmd
+        mid3v2 -a "${artist[$convertcount]}" -A "${album[$convertcount]}" -T "${tracknum[$convertcount]}" -t "${title[$convertcount]}" "${tracknames[$convertcount]}.mp3"
+        set +x
+        rm "$wavenum.wav"
+        convertcount=$[$convertcount + 1]
+
+done
