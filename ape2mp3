@@ -77,14 +77,11 @@ while [ $convertcount -le $tracks ]
 do
         wavenum=`printf "%02d" $convertcount`
 
-        lamecmd="lame --add-id3v2 --noreplaygain -b 320 $wavenum.wav ${tracknames[$convertcount]}.mp3"
-        echo $lamecmd
         set -x
         #lame --add-id3v2 --noreplaygain -b 320 --ta "${artist[$convertcount]}" --tl "${album[$convertcount]}" --tn "${tracknum[$convertcount]}" --tt "${title[$convertcount]}" "$wavenum.wav" "${tracknames[$convertcount]}.mp3"
-        $lamecmd
+        lame --add-id3v2 --noreplaygain -b 320 "$wavenum.wav" "${tracknames[$convertcount]}.mp3"
         mid3v2 -a "${artist[$convertcount]}" -A "${album[$convertcount]}" -T "${tracknum[$convertcount]}" -t "${title[$convertcount]}" "${tracknames[$convertcount]}.mp3"
         set +x
         rm "$wavenum.wav"
         convertcount=$[$convertcount + 1]
-
 done
